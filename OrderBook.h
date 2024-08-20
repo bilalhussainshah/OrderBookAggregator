@@ -22,6 +22,9 @@ public:
     void print(std::ofstream&) const;
     double calculatePriceToBuy(double quantity) const;
     double calculatePriceToSell(double quantity) const;
+    double calculateTotalCostToBuy(double quantity) const;
+    double calculateTotalCostToSell(double quantity) const;
+
 
 
 };

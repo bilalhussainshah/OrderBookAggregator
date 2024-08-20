@@ -84,3 +84,41 @@ double OrderBook::calculatePriceToSell(double quantity) const {
 
     return totalRevenue;
 }
+
+double OrderBook::calculateTotalCostToBuy(double quantity) const {
+    double totalCost = 0.0;
+    double remainingQuantity = quantity;
+
+    for (const auto& ask : offers) {
+        double availableQuantity = ask.quantity;
+        double tradeQuantity = std::min(remainingQuantity, availableQuantity);
+        totalCost += tradeQuantity * ask.price;
+        remainingQuantity -= tradeQuantity;
+        if (remainingQuantity <= 0) break;
+    }
+
+    if (remainingQuantity > 0) {
+        return -1.0;  // Not enough liquidity to fulfill the order
+    }
+
+    return totalCost;
+}
+
+double OrderBook::calculateTotalCostToSell(double quantity) const {
+    double totalCost = 0.0;
+    double remainingQuantity = quantity;
+
+    for (const auto& bid : bids) {
+        double availableQuantity = bid.quantity;
+        double tradeQuantity = std::min(remainingQuantity, availableQuantity);
+        totalCost += tradeQuantity * bid.price;
+        remainingQuantity -= tradeQuantity;
+        if (remainingQuantity <= 0) break;
+    }
+
+    if (remainingQuantity > 0) {
+        return -1.0;  // Not enough liquidity to fulfill the order
+    }
+
+    return totalCost;
+}

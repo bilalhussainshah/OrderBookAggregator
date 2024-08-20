@@ -1,1 +1,1 @@
-exclude_kraken
+include_kraken

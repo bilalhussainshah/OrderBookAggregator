@@ -2,8 +2,26 @@
 #include "ExchangeAPI.h"
 #include "utility.h"
 #include <iostream>
-#include <fstream>  // Include for file operations
+#include <fstream>
+#include <algorithm>  // Include for sorting
 
+// Helper function to merge order books
+void mergeOrderBooks(OrderBook& merged, const OrderBook& other) {
+    merged.offers.insert(merged.offers.end(), other.offers.begin(), other.offers.end());
+    merged.bids.insert(merged.bids.end(), other.bids.begin(), other.bids.end());
+
+    // Sort asks (ascending)
+    std::sort(merged.offers.begin(), merged.offers.end(),
+        [](const Order& a, const Order& b) {
+            return a.price < b.price;
+        });
+
+    // Sort bids (descending)
+    std::sort(merged.bids.begin(), merged.bids.end(),
+        [](const Order& a, const Order& b) {
+            return a.price > b.price;
+        });
+}
 void OrderBookAggregator::fetchAndProcessOrderBooks() {
     // Define URLs for APIs
     const std::string coinbaseUrl = "https://api.pro.coinbase.com/products/BTC-USD/book?level=2";
@@ -53,6 +71,7 @@ void OrderBookAggregator::fetchAndProcessOrderBooks() {
         krakenOrderBook = ExchangeAPI::parseOrderBookKraken(krakenData);
     }
 
+
     // Open a file stream to write the output
     std::ofstream outFile("order_books.txt");
 
@@ -76,22 +95,28 @@ void OrderBookAggregator::fetchAndProcessOrderBooks() {
         double krakenBuyPrice = includeKraken ? krakenOrderBook.calculatePriceToBuy(quantity) : -1.0;
 
         if (coinbaseBuyPrice >= 0) {
-            outFile << "Price to buy " << quantity << " Bitcoin on Coinbase: " << coinbaseBuyPrice << std::endl;
+            outFile << "Total Offers on Coinbase: " << coinbaseOrderBook.offers.size() << std::endl;
+            outFile << "Price to buy " << quantity << " Bitcoin(s) on Coinbase: " << coinbaseBuyPrice << std::endl;
+            outFile << "Average execution price to buy " << quantity << " Bitcoin(s) on Coinbase: " << (coinbaseBuyPrice / quantity) << std::endl;
         }
         else {
-            outFile << "Not enough offers to buy " << quantity << " Bitcoin on Coinbase." << std::endl;
+            outFile << "Not enough offers to buy " << quantity << " Bitcoin(s) on Coinbase." << std::endl;
         }
         if (geminiBuyPrice >= 0) {
-            outFile << "Price to buy " << quantity << " Bitcoin on Gemini: " << geminiBuyPrice << std::endl;
+            outFile << "Total Offers on Gemini: " << geminiOrderBook.offers.size() << std::endl;
+            outFile << "Price to buy " << quantity << " Bitcoin(s) on Gemini: " << geminiBuyPrice << std::endl;
+            outFile << "Average execution price to buy " << quantity << " Bitcoin(s) on Gemini: " << (geminiBuyPrice / quantity) << std::endl;
         }
         else {
-            outFile << "Not enough offers to buy " << quantity << " Bitcoin on Gemini." << std::endl;
+            outFile << "Not enough offers to buy " << quantity << " Bitcoin(s) on Gemini." << std::endl;
         }
         if (includeKraken && krakenBuyPrice >= 0) {
-            outFile << "Price to buy " << quantity << " Bitcoin on Kraken: " << krakenBuyPrice << std::endl;
+            outFile << "Total Offers on Kraken: " << krakenOrderBook.offers.size() << std::endl;
+            outFile << "Price to buy " << quantity << " Bitcoin(s) on Kraken: " << krakenBuyPrice << std::endl;
+            outFile << "Average execution price to buy " << quantity << " Bitcoin(s) on Kraken: " << (krakenBuyPrice / quantity) << std::endl;
         }
         else if (includeKraken) {
-            outFile << "Not enough offers to buy " << quantity << " Bitcoin on Kraken." << std::endl;
+            outFile << "Not enough offers to buy " << quantity << " Bitcoin(s) on Kraken." << std::endl;
         }
 
         // Calculate and print price to sell the specified quantity
@@ -100,24 +125,73 @@ void OrderBookAggregator::fetchAndProcessOrderBooks() {
         double krakenSellPrice = includeKraken ? krakenOrderBook.calculatePriceToSell(quantity) : -1.0;
 
         if (coinbaseSellPrice >= 0) {
-            outFile << "Price to sell " << quantity << " Bitcoin on Coinbase: " << coinbaseSellPrice << std::endl;
+            outFile << "Total Bids on Coinbase: " << coinbaseOrderBook.bids.size() << std::endl;
+            outFile << "Price to sell " << quantity << " Bitcoin(s) on Coinbase: " << coinbaseSellPrice << std::endl;
+            outFile << "Average execution price to sell " << quantity << " Bitcoin(s) on Coinbase: " << (coinbaseSellPrice / quantity) << std::endl;
         }
         else {
-            outFile << "Not enough bids to sell " << quantity << " Bitcoin on Coinbase." << std::endl;
+            outFile << "Not enough bids to sell " << quantity << " Bitcoin(s) on Coinbase." << std::endl;
         }
         if (geminiSellPrice >= 0) {
-            outFile << "Price to sell " << quantity << " Bitcoin on Gemini: " << geminiSellPrice << std::endl;
+            outFile << "Total Bids on Gemini: " << geminiOrderBook.bids.size() << std::endl;
+            outFile << "Price to sell " << quantity << " Bitcoin(s) on Gemini: " << geminiSellPrice << std::endl;
+            outFile << "Average execution price to sell " << quantity << " Bitcoin(s) on Gemini: " << (geminiSellPrice / quantity) << std::endl;
         }
         else {
-            outFile << "Not enough bids to sell " << quantity << " Bitcoin on Gemini." << std::endl;
+            outFile << "Not enough bids to sell " << quantity << " Bitcoin(s) on Gemini." << std::endl;
         }
         if (includeKraken && krakenSellPrice >= 0) {
-            outFile << "Price to sell " << quantity << " Bitcoin on Kraken: " << krakenSellPrice << std::endl;
+            outFile << "Total Bids on Kraken: " << krakenOrderBook.bids.size() << std::endl;
+            outFile << "Price to sell " << quantity << " Bitcoin(s) on Kraken: " << krakenSellPrice << std::endl;
+            outFile << "Average execution price to sell " << quantity << " Bitcoin(s) on Kraken: " << (krakenSellPrice / quantity) << std::endl;
         }
         else if (includeKraken) {
-            outFile << "Not enough bids to sell " << quantity << " Bitcoin on Kraken." << std::endl;
+            outFile << "Not enough bids to sell " << quantity << " Bitcoin(s) on Kraken." << std::endl;
         }
         outFile.close();
+    }
+    else {
+        std::cerr << "Unable to open file for writing." << std::endl;
+    }
+
+    // Open a file stream to write the merged order book output
+    std::ofstream outMergedFile("merged_order_books.txt");
+
+    if (outMergedFile.is_open()) {
+
+        OrderBook mergedOrderBook;
+
+        // Merge order books from different exchanges
+        mergeOrderBooks(mergedOrderBook, coinbaseOrderBook);
+        mergeOrderBooks(mergedOrderBook, geminiOrderBook);
+        if (includeKraken) {
+            mergeOrderBooks(mergedOrderBook, krakenOrderBook);
+        }
+
+        outMergedFile << "Merged Order Book:" << std::endl;
+        mergedOrderBook.print(outMergedFile);
+
+
+        double totalCostToBuy = mergedOrderBook.calculateTotalCostToBuy(quantity);
+        double totalCostToSell = mergedOrderBook.calculateTotalCostToSell(quantity);
+
+        if (totalCostToBuy >= 0) {
+            outMergedFile << "Total Offers in Merged Order Book: " << mergedOrderBook.offers.size() << std::endl;
+            outMergedFile << "Total cost to buy " << quantity << " Bitcoin across merged order book: " << totalCostToBuy << std::endl;
+            outMergedFile << "Average execution price to buy " << quantity << " Bitcoin(s) across merged order book: " << (totalCostToBuy / quantity) << std::endl;
+        }
+        else {
+            outMergedFile << "Not enough offers to buy " << quantity << " Bitcoin across merged order book." << std::endl;
+        }
+
+        if (totalCostToSell >= 0) {
+            outMergedFile << "Total Bids in Merged Order Book: " << mergedOrderBook.bids.size() << std::endl;
+            outMergedFile << "Total cost to sell " << quantity << " Bitcoin(s) across merged order book: " << totalCostToSell << std::endl;
+            outMergedFile << "Average execution price to sell " << quantity << " Bitcoin(s) across merged order book: " << (totalCostToSell / quantity) << std::endl;
+        }
+        else {
+            outMergedFile << "Not enough bids to sell " << quantity << " Bitcoin(s) across merged order book." << std::endl;
+        }
     }
     else {
         std::cerr << "Unable to open file for writing." << std::endl;
